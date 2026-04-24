@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-metallic-900 text-slate-200 font-sans antialiased overflow-hidden select-none;
+    /* iPad Safari optimizations */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-metallic-800/80 backdrop-blur-md border border-metallic-700 shadow-xl;
+  }
+  
+  .glass-panel-active {
+    @apply bg-metallic-800/90 backdrop-blur-lg border border-gold-500/50 shadow-[0_0_15px_rgba(212,175,55,0.1)];
+  }
+
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-gold-400 to-gold-600;
+  }
+
+  .nav-item {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 text-slate-400 hover:text-gold-400 hover:bg-metallic-700/50 cursor-pointer;
+  }
+  
+  .nav-item.active {
+    @apply text-gold-500 bg-gold-500/10 shadow-[inset_2px_0_0_rgba(212,175,55,1)];
+  }
+}
+
+/* Custom Scrollbar for hidden but scrollable areas */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-metallic-900/50 rounded;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-metallic-700 rounded;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-metallic-600;
+}

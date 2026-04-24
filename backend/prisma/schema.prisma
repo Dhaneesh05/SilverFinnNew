@@ -1,0 +1,280 @@
+// Silver Finn — Prisma Schema
+// Multi-tenant, franchise-ready workshop management platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  MECHANIC
+  ADVISOR
+  ADMIN
+}
+
+enum ServiceType {
+  MINOR      // e.g. 5,000km – 10,000km
+  MAJOR      // e.g. 40,000km – 80,000km
+  INSPECTION // Standalone diagnostic
+}
+
+enum CheckResult {
+  PASS
+  FAIL
+  NA
+}
+
+enum AlertStatus {
+  ACTIVE
+  DISMISSED
+  RESOLVED
+}
+
+// ─────────────────────────────────────────────
+// WORKSHOP (Multi-tenant root)
+// ─────────────────────────────────────────────
+
+model Workshop {
+  id        String   @id @default(cuid())
+  name      String
+  location  String
+  phone     String?
+  email     String?
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  customers Customer[]
+  vehicles  Vehicle[]
+  sessions  ServiceSession[]
+  templates ChecklistTemplate[]
+  alerts    MaintenanceAlert[]
+}
+
+// ─────────────────────────────────────────────
+// USER (Mechanic / Advisor / Admin)
+// ─────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  workshopId   String
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  avatarUrl    String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workshop      Workshop         @relation(fields: [workshopId], references: [id])
+  sessions      ServiceSession[] // Sessions this mechanic performed
+  dismissedAlerts MaintenanceAlert[] @relation("DismissedBy")
+}
+
+// ─────────────────────────────────────────────
+// CUSTOMER
+// ─────────────────────────────────────────────
+
+model Customer {
+  id         String   @id @default(cuid())
+  workshopId String
+  name       String
+  phone      String
+  email      String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  workshop Workshop  @relation(fields: [workshopId], references: [id])
+  vehicles Vehicle[]
+}
+
+// ─────────────────────────────────────────────
+// VEHICLE
+// ─────────────────────────────────────────────
+
+model Vehicle {
+  id             String   @id @default(cuid())
+  workshopId     String
+  customerId     String
+  make           String   // e.g. "Toyota"
+  model          String   // e.g. "Vios"
+  year           Int
+  plateNumber    String
+  vin            String?
+  colour         String?
+  engineType     String?  // e.g. "1.5L NR-FE"
+  transmissionType String? // "Auto" | "Manual"
+  currentMileage Int      @default(0)
+  glbModelKey    String?  // Key for which 3D model to show in UI
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workshop  Workshop         @relation(fields: [workshopId], references: [id])
+  customer  Customer         @relation(fields: [customerId], references: [id])
+  sessions  ServiceSession[]
+  alerts    MaintenanceAlert[]
+
+  @@index([workshopId, make, model]) // For prediction queries
+}
+
+// ─────────────────────────────────────────────
+// SERVICE SESSION (One workshop visit)
+// ─────────────────────────────────────────────
+
+model ServiceSession {
+  id             String      @id @default(cuid())
+  workshopId     String
+  vehicleId      String
+  mechanicId     String
+  sessionDate    DateTime    @default(now())
+  mileageAtVisit Int
+  serviceType    ServiceType
+  totalCostMyr   Decimal?    @db.Decimal(10, 2)
+  laborCostMyr   Decimal?    @db.Decimal(10, 2)
+  notes          String?
+  isCompleted    Boolean     @default(false)
+  completedAt    DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  workshop      Workshop       @relation(fields: [workshopId], references: [id])
+  vehicle       Vehicle        @relation(fields: [vehicleId], references: [id])
+  mechanic      User           @relation(fields: [mechanicId], references: [id])
+  checkItems    CheckItem[]
+  replacedParts ReplacedPart[]
+
+  @@index([vehicleId, sessionDate])
+  @@index([workshopId, sessionDate])
+}
+
+// ─────────────────────────────────────────────
+// CHECKLIST TEMPLATE (Configurable per mileage)
+// ─────────────────────────────────────────────
+
+model ChecklistTemplate {
+  id              String      @id @default(cuid())
+  workshopId      String
+  name            String      // e.g. "10,000km Minor Service"
+  description     String?
+  mileageTrigger  Int         // km milestone, e.g. 10000
+  serviceType     ServiceType
+  isDefault       Boolean     @default(false)
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  workshop Workshop              @relation(fields: [workshopId], references: [id])
+  items    ChecklistTemplateItem[]
+}
+
+model ChecklistTemplateItem {
+  id           String  @id @default(cuid())
+  templateId   String
+  zone         String  // 3D hotspot zone: "engine" | "front-left" | "front-right" | "rear-left" | "rear-right" | "undercarriage" | "transmission" | "electrical"
+  category     String  // e.g. "Engine Fluids", "Tyres & Brakes"
+  itemName     String  // e.g. "Engine Oil Level"
+  guideline    String  // e.g. "Should be golden/amber. Black/dark = FAIL. Check between MIN/MAX marks."
+  isMandatory  Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  template ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  checkItems CheckItem[]
+}
+
+// ─────────────────────────────────────────────
+// CHECK ITEM (Mechanic's result for one item)
+// ─────────────────────────────────────────────
+
+model CheckItem {
+  id             String      @id @default(cuid())
+  sessionId      String
+  templateItemId String
+  result         CheckResult
+  notes          String?
+  photoUrl       String?     // Cloudinary URL
+  checkedAt      DateTime    @default(now())
+
+  session      ServiceSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  templateItem ChecklistTemplateItem @relation(fields: [templateItemId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// REPLACED PART (Parts changed in a session)
+// ─────────────────────────────────────────────
+
+model ReplacedPart {
+  id          String   @id @default(cuid())
+  sessionId   String
+  partName    String   // e.g. "Engine Oil Filter"
+  partNumber  String?  // e.g. "MANN W712/83"
+  brand       String?  // e.g. "MANN"
+  category    String?  // e.g. "Engine", "Brakes", "Tyres"
+  costMyr     Decimal  @db.Decimal(10, 2)
+  quantity    Int      @default(1)
+  photoUrl    String?  // Photo of old/new part
+  notes       String?
+  replacedAt  DateTime @default(now())
+
+  session ServiceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([partName]) // For prediction frequency queries
+  @@index([sessionId])
+}
+
+// ─────────────────────────────────────────────
+// PART CATALOGUE (Pre-populated lookup / autocomplete)
+// ─────────────────────────────────────────────
+
+model PartCatalogue {
+  id               String   @id @default(cuid())
+  partName         String
+  partNumber       String   @unique
+  brand            String
+  category         String   // "Engine" | "Brakes" | "Tyres" | "Electrical" | "Transmission" | "Suspension" | "Exhaust" | "Cooling"
+  compatibleMakes  String[] // e.g. ["Toyota", "Honda"]
+  compatibleModels String[] // e.g. ["Vios", "City"]
+  suggestedCostMyr Decimal? @db.Decimal(10, 2)
+  unit             String   @default("piece") // "litre" | "piece" | "set"
+  createdAt        DateTime @default(now())
+
+  @@index([category])
+  @@index([compatibleMakes])
+}
+
+// ─────────────────────────────────────────────
+// MAINTENANCE ALERT (Predictive proactive alerts)
+// ─────────────────────────────────────────────
+
+model MaintenanceAlert {
+  id             String      @id @default(cuid())
+  workshopId     String
+  vehicleId      String
+  alertType      String      // e.g. "Brake Pads Due", "Oil Change Overdue"
+  partName       String      // The specific part flagged
+  message        String      // Human-readable alert message
+  probability    Float       // 0.0 – 1.0 from prediction engine
+  triggerMileage Int         // The current mileage when alert was generated
+  status         AlertStatus @default(ACTIVE)
+  dismissedById  String?     // User who dismissed it
+  dismissReason  String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  workshop   Workshop @relation(fields: [workshopId], references: [id])
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id])
+  dismissedBy User?  @relation("DismissedBy", fields: [dismissedById], references: [id])
+
+  @@index([vehicleId, status])
+  @@index([workshopId, status])
+}
