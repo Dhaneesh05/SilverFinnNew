@@ -12,11 +12,14 @@ export default function GarageView() {
 
   return (
     <div className="w-full h-full relative">
-      {/* 3D Canvas Background Layer */}
+      {/* Background Image Layer */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" 
         style={{ backgroundImage: "url('/garage_bg.png')" }}
-      >
+      />
+      
+      {/* 3D Canvas Layer - Pushed down by 25% to align with the floor in the image */}
+      <div className="absolute inset-0 z-0" style={{ transform: 'translateY(25%)' }}>
         <Canvas shadows dpr={[1, 2]} camera={{ position: [5, 2, 5], fov: 45 }}>
           
           <Suspense fallback={null}>
