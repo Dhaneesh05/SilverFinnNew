@@ -3,7 +3,7 @@ import { Car, Wrench, AlertTriangle, Play, Gauge, ChevronRight } from 'lucide-re
 import { useStore } from '../../store/useStore';
 
 export default function VehicleInfoOverlay() {
-  const { currentSession, startSession, endSession, token, selectedVehicle } = useStore();
+  const { currentSession, startSession, endSession, token, selectedVehicle, predictions, setPredictions } = useStore();
   const [checklists, setChecklists] = useState([]);
   const [selectedChecklist, setSelectedChecklist] = useState(null);
   const [showChecklistPicker, setShowChecklistPicker] = useState(false);
@@ -29,7 +29,6 @@ export default function VehicleInfoOverlay() {
 
   const [editableMileage, setEditableMileage] = useState(0);
   const [previousMileage, setPreviousMileage] = useState(null);
-  const [predictions, setPredictions] = useState([]);
 
   useEffect(() => {
     if (vehicle) setEditableMileage(vehicle.currentMileage || 0);

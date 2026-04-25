@@ -71,6 +71,10 @@ export const useStore = create((set, get) => ({
   selectedVehicle: null,
   selectVehicle: (vehicle) => set({ selectedVehicle: vehicle }),
 
+  // Predictions (shared between VehicleInfoOverlay and ChecklistOverlay)
+  predictions: [],
+  setPredictions: (predictions) => set({ predictions }),
+
   // ── Service Session ────────────────────────────────────────────────
   currentSession: null,
 

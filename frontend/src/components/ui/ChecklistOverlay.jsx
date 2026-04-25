@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useStore, ZONE_SEQUENCE, ZONE_LABELS } from '../../store/useStore';
-import { Check, X, Minus, Camera, ChevronRight, FileText, DollarSign, Wrench, Upload, Package } from 'lucide-react';
+import { Check, X, Minus, Camera, ChevronRight, FileText, DollarSign, Wrench, Upload, Package, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -153,6 +153,7 @@ export default function ChecklistOverlay() {
     selectVehicle,
     currentStepIndex,
     advanceToNextZone,
+    predictions,
   } = useStore();
 
   const [submitting, setSubmitting] = useState(false);
@@ -667,6 +668,9 @@ export default function ChecklistOverlay() {
                 const existingPart = (currentSession.replacedParts || []).find(p => p.itemId === item.id);
                 const showPartForm = expandedFailForms[item.id] && res === 'FAIL';
 
+                // Check if this item has a high-probability prediction warning
+                const predictionWarning = predictions?.find(p => p.partName.toLowerCase() === item.itemName.toLowerCase());
+
                 return (
                   <div key={item.id} className={clsx(
                     "p-4 rounded-xl border transition-all duration-200",
@@ -674,6 +678,14 @@ export default function ChecklistOverlay() {
                   )}>
                     <div className="flex justify-between items-start mb-3">
                       <div>
+                        {predictionWarning && predictionWarning.probability >= 0.3 && (
+                          <div className="mb-2 flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded text-red-400 max-w-fit">
+                            <AlertTriangle size={12} />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">
+                              Predicted Failure: {Math.round(predictionWarning.probability * 100)}% Risk
+                            </span>
+                          </div>
+                        )}
                         <span className="text-[10px] uppercase font-bold tracking-widest text-gold-600 mb-1 block">{item.category}</span>
                         <h4 className="font-semibold text-white text-sm">{item.itemName}</h4>
                       </div>
