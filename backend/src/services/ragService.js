@@ -44,8 +44,8 @@ async function initVectorStore() {
       const splitDocs = await textSplitter.splitDocuments(docs);
       
       const embeddings = new GoogleGenerativeAIEmbeddings({
-        model: "text-embedding-004",
-        apiKey: process.env.GEMINI_API_KEY
+        model: "gemini-embedding-2",
+        apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
       });
 
       const vectors = await embeddings.embedDocuments(splitDocs.map(d => d.pageContent));
@@ -99,8 +99,8 @@ async function processChat(vehicleId, workshopId, userMessage, chatHistory = [])
   if (localDocs.length > 0) {
     try {
       const embeddings = new GoogleGenerativeAIEmbeddings({
-        model: "text-embedding-004",
-        apiKey: process.env.GEMINI_API_KEY
+        model: "gemini-embedding-2",
+        apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
       });
       const queryVector = await embeddings.embedQuery(userMessage);
       
@@ -130,9 +130,9 @@ ${manualContext}
 
 Answer the following user query professionally.`;
 
-  const API_KEY = process.env.GEMINI_API_KEY;
+  const API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
   if (!API_KEY) {
-    return `[MOCK AI RESPONSE]\nContext used: ${vehicleContext ? 'Yes' : 'No'}\nManuals used: ${manualContext ? 'Yes' : 'No'}\nNo GEMINI_API_KEY found in .env!`;
+    return `[MOCK AI RESPONSE]\nContext used: ${vehicleContext ? 'Yes' : 'No'}\nManuals used: ${manualContext ? 'Yes' : 'No'}\nNo GOOGLE_API_KEY found in .env!`;
   }
 
   const messages = [
@@ -146,6 +146,7 @@ Answer the following user query professionally.`;
       model: "gemini-2.0-flash",
       temperature: 0.3,
       apiKey: API_KEY,
+      maxRetries: 0
     });
 
     const response = await chat.invoke(messages);
