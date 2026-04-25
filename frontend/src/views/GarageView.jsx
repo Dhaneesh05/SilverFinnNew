@@ -13,10 +13,11 @@ export default function GarageView() {
   return (
     <div className="w-full h-full relative">
       {/* 3D Canvas Background Layer */}
-      <div className="absolute inset-0 z-0 bg-gradient-to-b from-metallic-900 to-black">
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" 
+        style={{ backgroundImage: "url('/garage_bg.png')" }}
+      >
         <Canvas shadows dpr={[1, 2]} camera={{ position: [5, 2, 5], fov: 45 }}>
-          <color attach="background" args={['#0A0C0F']} />
-          <fog attach="fog" args={['#0A0C0F', 20, 100]} />
           
           <Suspense fallback={null}>
             <Environment preset="studio" environmentIntensity={1.5} />
