@@ -20,7 +20,15 @@ const ZONE_CAMERAS = {
 const TARGET_SIZE = 4;
 
 export default function CarModel(props) {
-  const { scene } = useGLTF('/2019_mercedes-benz_c63_s_amg_coupe.glb');
+  const currentSession = useStore(state => state.currentSession);
+  const selectedVehicle = useStore(state => state.selectedVehicle);
+  const activeVehicle = currentSession?.vehicle || selectedVehicle;
+  
+  const modelUrl = activeVehicle?.glbModelKey 
+    ? `/${activeVehicle.glbModelKey}.glb` 
+    : '/2019_mercedes-benz_c63_s_amg_coupe.glb';
+    
+  const { scene } = useGLTF(modelUrl);
   const activeZone = useStore(state => state.activeZone);
   const setActiveZone = useStore(state => state.setActiveZone);
   const groupRef = useRef();
@@ -51,7 +59,7 @@ export default function CarModel(props) {
     const scaledMin = scaledBox.min;
 
     scene.position.set(-center.x, -scaledMin.y, -center.z);
-  }, [scene]);
+  }, [scene, modelUrl]); // re-run if modelUrl changes
 
   useFrame((state, delta) => {
     const config = ZONE_CAMERAS[activeZone] || ZONE_CAMERAS['overview'];
@@ -94,6 +102,4 @@ export default function CarModel(props) {
     </group>
   );
 }
-
-useGLTF.preload('/2019_mercedes-benz_c63_s_amg_coupe.glb');
 

@@ -25,7 +25,7 @@ router.get('/', async (req, res, next) => {
     const [customers, total] = await Promise.all([
       prisma.customer.findMany({
         where,
-        include: { vehicles: { select: { id: true, make: true, model: true, year: true, plateNumber: true } } },
+        include: { vehicles: { select: { id: true, make: true, model: true, year: true, plateNumber: true, glbModelKey: true } } },
         orderBy: { name: 'asc' },
         skip,
         take: Number(limit),
@@ -62,11 +62,27 @@ router.get('/:id', async (req, res, next) => {
 // POST /api/customers
 router.post('/', async (req, res, next) => {
   try {
-    const { name, phone, email, notes } = req.body;
+    const { name, phone, email, notes, vehicle } = req.body;
     if (!name || !phone) return res.status(400).json({ error: 'Name and phone required' });
 
+    const data = { workshopId: req.user.workshopId, name, phone, email, notes };
+    
+    if (vehicle && vehicle.plateNumber && vehicle.make && vehicle.model) {
+      data.vehicles = {
+        create: {
+          workshopId: req.user.workshopId,
+          make: vehicle.make,
+          model: vehicle.model,
+          year: parseInt(vehicle.year, 10) || new Date().getFullYear(),
+          plateNumber: vehicle.plateNumber,
+          glbModelKey: vehicle.glbModelKey || undefined,
+        }
+      };
+    }
+
     const customer = await prisma.customer.create({
-      data: { workshopId: req.user.workshopId, name, phone, email, notes },
+      data,
+      include: { vehicles: true }
     });
     res.status(201).json(customer);
   } catch (err) { next(err); }

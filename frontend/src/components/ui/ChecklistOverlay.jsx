@@ -4,7 +4,7 @@ import { Check, X, Minus, Camera, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ChecklistOverlay() {
-  const { currentSession, activeZone, setActiveZone, recordResult, endSession, token } = useStore();
+  const { currentSession, activeZone, setActiveZone, recordResult, endSession, token, setActiveView, selectVehicle } = useStore();
   const [submitting, setSubmitting] = React.useState(false);
 
   if (!currentSession) {
@@ -18,6 +18,8 @@ export default function ChecklistOverlay() {
   const submitInspection = async () => {
     if (!currentSession.backendSessionId || !token) {
       endSession();
+      setActiveView('customers');
+      selectVehicle(null);
       return;
     }
 
@@ -53,11 +55,15 @@ export default function ChecklistOverlay() {
     } finally {
       setSubmitting(false);
       endSession();
+      setActiveView('customers');
+      selectVehicle(null);
     }
   };
 
   // Filter items by current 3D zone
-  const zoneItems = currentSession.template.items.filter(item => item.zone === activeZone);
+  const zoneItems = activeZone === 'overview'
+    ? currentSession.template.items
+    : currentSession.template.items.filter(item => item.zone === activeZone);
   
   // Calculate overall progress
   const totalItems = currentSession.template.items.length;
@@ -179,11 +185,11 @@ export default function ChecklistOverlay() {
         {/* Next Zone Guidance */}
         <div className="p-3 border-t border-metallic-700/50 bg-metallic-900/30 shrink-0">
           <button 
-            disabled={submitting}
+            disabled={submitting || (activeZone === 'overview' && progressPercent < 100)}
             onClick={() => {
               if (progressPercent === 100) {
                 submitInspection();
-              } else {
+              } else if (activeZone !== 'overview') {
                 // Simple zone cycler for demo
                 const zones = ['engine', 'front-left', 'front-right', 'rear-right', 'rear-left', 'undercarriage'];
                 const idx = zones.indexOf(activeZone);
@@ -191,10 +197,21 @@ export default function ChecklistOverlay() {
                 else setActiveZone('overview');
               }
             }}
-            className="w-full py-3 bg-metallic-800 hover:bg-metallic-700 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2 transition-colors border border-metallic-600 disabled:opacity-50"
+            className={clsx(
+              "w-full py-3 font-semibold text-sm rounded-xl flex items-center justify-center gap-2 transition-colors border",
+              submitting || (activeZone === 'overview' && progressPercent < 100)
+                ? "bg-metallic-800 text-slate-500 border-metallic-700 cursor-not-allowed"
+                : "bg-metallic-800 hover:bg-metallic-700 text-white border-metallic-600"
+            )}
           >
-            {submitting ? 'SUBMITTING...' : (progressPercent === 100 ? 'COMPLETE INSPECTION' : 'NEXT ZONE')}
-            {!submitting && <ChevronRight size={16} />}
+            {submitting 
+              ? 'SUBMITTING...' 
+              : progressPercent === 100 
+                ? 'COMPLETE INSPECTION' 
+                : activeZone === 'overview' 
+                  ? 'COMPLETE ALL ITEMS TO SUBMIT' 
+                  : 'NEXT ZONE'}
+            {!submitting && progressPercent !== 100 && activeZone !== 'overview' && <ChevronRight size={16} />}
           </button>
         </div>
       </div>

@@ -113,6 +113,42 @@ async function main() {
     },
   });
 
+  // Create Test Customers & Vehicles
+  const c1 = await prisma.customer.create({
+    data: { workshopId: workshop.id, name: 'Sarah Jenkins', phone: '+60 12-345 6789', email: 'sarah@example.com' }
+  });
+  await prisma.vehicle.create({
+    data: { workshopId: workshop.id, customerId: c1.id, make: 'Mercedes-Benz', model: 'C63 S AMG', year: 2019, plateNumber: 'WAA 1234', glbModelKey: '2019_mercedes-benz_c63_s_amg_coupe', currentMileage: 45000 }
+  });
+
+  const c2 = await prisma.customer.create({
+    data: { workshopId: workshop.id, name: 'Ahmad Faizal', phone: '+60 19-876 5432', email: 'ahmad@example.com' }
+  });
+  await prisma.vehicle.create({
+    data: { workshopId: workshop.id, customerId: c2.id, make: 'Audi', model: 'RS7 Sportback', year: 2020, plateNumber: 'JQF 8888', glbModelKey: '2020_audi_rs7_sportback', currentMileage: 32000 }
+  });
+
+  const c3 = await prisma.customer.create({
+    data: { workshopId: workshop.id, name: 'Takeshi', phone: '+60 11-111 2222', email: 'takeshi@example.com' }
+  });
+  await prisma.vehicle.create({
+    data: { workshopId: workshop.id, customerId: c3.id, make: 'Toyota', model: 'Sprinter Trueno AE86', year: 1985, plateNumber: 'AE 86', glbModelKey: '1985_toyota_sprinter_trueno_ae86_project_d', currentMileage: 150000 }
+  });
+
+  const c4 = await prisma.customer.create({
+    data: { workshopId: workshop.id, name: 'Rajesh Kumar', phone: '+60 16-555 4444', email: 'rajesh@example.com' }
+  });
+  await prisma.vehicle.create({
+    data: { workshopId: workshop.id, customerId: c4.id, make: 'BMW', model: 'M3 E30', year: 1990, plateNumber: 'PEN 330', glbModelKey: 'free_bmw_m3_e30', currentMileage: 120000 }
+  });
+
+  const c5 = await prisma.customer.create({
+    data: { workshopId: workshop.id, name: 'Mei Ling', phone: '+60 13-999 8888', email: 'mei@example.com' }
+  });
+  await prisma.vehicle.create({
+    data: { workshopId: workshop.id, customerId: c5.id, make: 'Toyota', model: 'Supra A80', year: 1993, plateNumber: 'BND 993', glbModelKey: 'toyota_supra_a80_1993', currentMileage: 95000 }
+  });
+
   console.log('✅ Minimal seed complete!');
 }
 
