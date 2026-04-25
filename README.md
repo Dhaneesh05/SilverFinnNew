@@ -4,6 +4,9 @@
 
 Created for **UMHackathon2026-The_Hacktivists**.
 
+The Video Presentation Link:
+https://drive.google.com/drive/folders/1oJ7kpkgNQqk_GVwdk7DMD4zoCMEg5eHx?usp=sharing 
+
 ## ✨ Key Features
 
 - **🏎️ 3D Interactive Garage:** A fully immersive 3D interface built with `react-three-fiber`. Mechanics can visually select and inspect specific vehicle zones (Engine, Undercarriage, Interior, etc.) dynamically.
@@ -88,8 +91,7 @@ The `/backend/car_manuals/` directory contains PDF/TXT repair manuals. The backe
 ## 🤝 Contributing
 Contributions, issues, and feature requests are welcome!
 
-The Video Presentation Link:
-https://drive.google.com/drive/folders/1oJ7kpkgNQqk_GVwdk7DMD4zoCMEg5eHx?usp=sharing 
+
 
 ---
 *Developed with ❤️ during the UM Hackathon 2026*
