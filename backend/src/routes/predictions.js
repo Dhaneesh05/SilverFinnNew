@@ -62,6 +62,26 @@ router.get('/analytics/top-parts', async (req, res, next) => {
         if (wasBroken) partStats[partName].brokenCount += 1;
       }
       
+      // Add real data from the database
+      const dbParts = await prisma.replacedPart.findMany({
+        include: { session: true }
+      });
+
+      for (const p of dbParts) {
+        const partName = p.partName;
+        const category = p.category || 'General';
+        const mileage = p.session?.mileageAtVisit || 0;
+        const wasBroken = true; // Parts replaced during session are assumed broken/worn
+
+        if (!partStats[partName]) {
+          partStats[partName] = { part: partName, category, totalMileage: 0, frequency: 0, brokenCount: 0 };
+        }
+        
+        partStats[partName].totalMileage += mileage;
+        partStats[partName].frequency += (p.quantity || 1);
+        if (wasBroken) partStats[partName].brokenCount += (p.quantity || 1);
+      }
+      
       const results = Object.values(partStats).map(p => ({
         part: p.part,
         category: p.category,
