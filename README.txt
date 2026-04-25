@@ -4,6 +4,9 @@ Silver Finn AI is a next-generation, AI-powered mechanic assistant and workshop 
 
 Created for UMHackathon2026-The_Hacktivists.
 
+The Video Presentation Link:
+https://drive.google.com/drive/folders/1oJ7kpkgNQqk_GVwdk7DMD4zoCMEg5eHx?usp=sharing 
+
 ================================================================================
 KEY FEATURES
 ================================================================================
@@ -101,7 +104,6 @@ CONTRIBUTING
 ================================================================================
 Contributions, issues, and feature requests are welcome!
 
-The Video Presentation Link:
-https://drive.google.com/drive/folders/1oJ7kpkgNQqk_GVwdk7DMD4zoCMEg5eHx?usp=sharing 
+
 
 Developed with care during the UM Hackathon 2026.
