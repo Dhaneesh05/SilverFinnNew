@@ -18,7 +18,14 @@ const app = express();
 
 // ── Middleware ─────────────────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow any localhost origin in development
+    if (!origin || /^http:\/\/localhost:\d+$/.test(origin)) {
+      return callback(null, true);
+    }
+    const allowed = process.env.FRONTEND_URL || 'http://localhost:5173';
+    callback(origin === allowed ? null : new Error('Not allowed by CORS'), origin === allowed);
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));

@@ -4,7 +4,8 @@ import { Check, X, Minus, Camera, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ChecklistOverlay() {
-  const { currentSession, activeZone, setActiveZone, recordResult, endSession } = useStore();
+  const { currentSession, activeZone, setActiveZone, recordResult, endSession, token } = useStore();
+  const [submitting, setSubmitting] = React.useState(false);
 
   if (!currentSession) {
     return (
@@ -13,6 +14,47 @@ export default function ChecklistOverlay() {
       </div>
     );
   }
+
+  const submitInspection = async () => {
+    if (!currentSession.backendSessionId || !token) {
+      endSession();
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const items = Object.entries(currentSession.results).map(([templateItemId, val]) => ({
+        templateItemId,
+        result: val.result,
+        notes: val.notes
+      }));
+
+      if (items.length > 0) {
+        await fetch(`/api/sessions/${currentSession.backendSessionId}/check-items`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ items })
+        });
+      }
+
+      await fetch(`/api/sessions/${currentSession.backendSessionId}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({})
+      });
+    } catch (e) {
+      console.error('Failed to submit inspection:', e);
+    } finally {
+      setSubmitting(false);
+      endSession();
+    }
+  };
 
   // Filter items by current 3D zone
   const zoneItems = currentSession.template.items.filter(item => item.zone === activeZone);
@@ -137,17 +179,22 @@ export default function ChecklistOverlay() {
         {/* Next Zone Guidance */}
         <div className="p-3 border-t border-metallic-700/50 bg-metallic-900/30 shrink-0">
           <button 
+            disabled={submitting}
             onClick={() => {
-              // Simple zone cycler for demo
-              const zones = ['engine', 'front-left', 'front-right', 'rear-right', 'rear-left', 'undercarriage'];
-              const idx = zones.indexOf(activeZone);
-              if (idx < zones.length - 1) setActiveZone(zones[idx + 1]);
-              else endSession();
+              if (progressPercent === 100) {
+                submitInspection();
+              } else {
+                // Simple zone cycler for demo
+                const zones = ['engine', 'front-left', 'front-right', 'rear-right', 'rear-left', 'undercarriage'];
+                const idx = zones.indexOf(activeZone);
+                if (idx < zones.length - 1) setActiveZone(zones[idx + 1]);
+                else setActiveZone('overview');
+              }
             }}
-            className="w-full py-3 bg-metallic-800 hover:bg-metallic-700 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2 transition-colors border border-metallic-600"
+            className="w-full py-3 bg-metallic-800 hover:bg-metallic-700 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2 transition-colors border border-metallic-600 disabled:opacity-50"
           >
-            {progressPercent === 100 ? 'COMPLETE INSPECTION' : 'NEXT ZONE'}
-            <ChevronRight size={16} />
+            {submitting ? 'SUBMITTING...' : (progressPercent === 100 ? 'COMPLETE INSPECTION' : 'NEXT ZONE')}
+            {!submitting && <ChevronRight size={16} />}
           </button>
         </div>
       </div>

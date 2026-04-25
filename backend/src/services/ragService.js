@@ -1,88 +1,92 @@
-const { ChatOpenAI } = require('@langchain/openai');
-const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
-const prisma = require('../lib/prisma');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+const { Chroma } = require("@langchain/community/vectorstores/chroma");
 
-// Initialize ZhipuAI (GLM-4) using OpenAI SDK compatibility
-// Zhipu's base URL: https://open.bigmodel.cn/api/paas/v4/
-const chatModel = new ChatOpenAI({
-  openAIApiKey: process.env.ZHIPUAI_API_KEY || 'dummy_key_if_not_set',
-  configuration: {
-    baseURL: 'https://open.bigmodel.cn/api/paas/v4/',
-  },
-  modelName: 'glm-4', 
-  temperature: 0.3, // Low temp for technical/mechanic advice
-});
+// Dummy embedder so we can connect to Chroma without a real key
+class ZhipuEmbeddings {
+  async embedDocuments(texts) { return texts.map(() => new Array(1536).fill(Math.random())); }
+  async embedQuery(text) { return new Array(1536).fill(Math.random()); }
+}
 
-/**
- * Handles chat requests from the mechanic.
- * Injects vehicle context into the prompt (Mini-RAG).
- */
 async function processChat(vehicleId, workshopId, userMessage, chatHistory = []) {
-  // 1. Retrieve Context (The "R" in RAG)
-  let contextText = "No specific vehicle selected.";
-  
+  let vehicleContext = "";
+  let manualContext = "";
+
+  // 1. Gather Internal Context (Mini-RAG)
   if (vehicleId) {
-    const vehicle = await prisma.vehicle.findFirst({
-      where: { id: vehicleId, workshopId },
-      include: {
-        alerts: { where: { status: 'ACTIVE' } },
-        sessions: {
-          take: 3,
-          orderBy: { sessionDate: 'desc' },
-          include: { replacedParts: true }
+    try {
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id: vehicleId },
+        include: { sessions: { include: { predictiveAlerts: true } } }
+      });
+      if (vehicle) {
+        vehicleContext = `Vehicle: ${vehicle.make} ${vehicle.model} (${vehicle.year}). Plate: ${vehicle.plateNumber}.\n`;
+        const recentSession = vehicle.sessions[0];
+        if (recentSession && recentSession.predictiveAlerts.length > 0) {
+          vehicleContext += `Active Alerts: ${recentSession.predictiveAlerts.map(a => a.component + ' (' + a.probability + '% risk)').join(', ')}.\n`;
         }
       }
-    });
-
-    if (vehicle) {
-      contextText = `
-Vehicle: ${vehicle.make} ${vehicle.model} (${vehicle.year})
-Odometer: ${vehicle.currentMileage} km
-Engine: ${vehicle.engineType || 'Unknown'} | Transmission: ${vehicle.transmissionType || 'Unknown'}
-
-ACTIVE PREDICTIVE ALERTS:
-${vehicle.alerts.map(a => `- ${a.alertType} (${Math.round(a.probability * 100)}% probability)`).join('\n') || 'None'}
-
-RECENT REPLACED PARTS (Last 3 sessions):
-${vehicle.sessions.flatMap(s => s.replacedParts.map(p => `- ${p.partName} (at ${s.mileageAtVisit}km)`)).join('\n') || 'None'}
-`;
+    } catch (e) {
+      console.error("DB Context Error:", e);
     }
   }
 
-  // 2. Build the System Prompt
-  const systemPrompt = `You are Silver Finn Assistant, an expert automotive mechanic AI helping a technician in the workshop.
-You have access to the following live context about the vehicle they are currently inspecting:
-
-<vehicle_context>
-${contextText}
-</vehicle_context>
-
-Guidelines:
-1. Provide highly technical, concise, and accurate advice.
-2. If asked about part specifications, oil grades, or torque settings, provide standard industry recommendations for the specific Make/Model if known, or explain how to check.
-3. If the technician asks about the vehicle's predictive alerts, reference the active alerts from the context.
-4. Keep responses brief and formatting clean (use bullet points) because the mechanic is reading this on an iPad while working.`;
-
-  // 3. Assemble Messages
-  const messages = [
-    new SystemMessage(systemPrompt),
-    ...chatHistory.map(msg => 
-      msg.role === 'user' ? new HumanMessage(msg.content) : new SystemMessage(msg.content)
-    ),
-    new HumanMessage(userMessage)
-  ];
-
-  // 4. Generate (The "G" in RAG)
+  // 2. Gather External Knowledge (ChromaDB Full RAG)
   try {
-    const response = await chatModel.invoke(messages);
-    return response.content;
-  } catch (error) {
-    console.error("[RAG Service] LLM Error:", error.message);
-    if (error.message.includes('401')) {
-      return "System Error: Zhipu AI API Key is invalid or missing in .env.";
+    const vectorStore = await Chroma.fromExistingCollection(new ZhipuEmbeddings(), {
+      collectionName: "workshop_manuals",
+      url: "http://localhost:8000"
+    });
+    
+    // Search vector store for relevant chunks
+    const results = await vectorStore.similaritySearch(userMessage, 2);
+    if (results && results.length > 0) {
+      manualContext = "\nRelevant Manual Excerpts:\n" + results.map(r => r.pageContent).join("\n");
     }
-    return "I'm having trouble connecting to the knowledge base right now. Please try again.";
+  } catch (error) {
+    console.warn("ChromaDB not available or manual collection missing. Skipping external manual retrieval.");
   }
+
+  const systemPrompt = `You are Silver Finn AI, an expert automotive technician assistant.
+You provide concise, highly technical advice to mechanics.
+Always use metric units and specify torque settings or exact specifications when possible.
+
+Current Vehicle Context:
+${vehicleContext || "No specific vehicle selected."}
+${manualContext}
+
+Answer the following user query professionally.`;
+
+  const payload = {
+    model: "glm-4",
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...chatHistory,
+      { role: "user", content: userMessage }
+    ],
+    temperature: 0.3
+  };
+
+  const API_KEY = process.env.ZHIPUAI_API_KEY || 'dummy_key';
+  
+  // If no real key, mock the response
+  if (API_KEY === 'dummy_key') {
+    return `[MOCK AI RESPONSE]\nContext used: ${vehicleContext ? 'Yes' : 'No'}\nManuals used: ${manualContext ? 'Yes' : 'No'}\nI am currently operating in test mode without a ZhipuAI key. For "${userMessage}", I would normally analyze the DB history and ChromaDB manuals.`;
+  }
+
+  const response = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${API_KEY}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message || "ZhipuAI API Error");
+
+  return data.choices[0].message.content;
 }
 
 module.exports = { processChat };

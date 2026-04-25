@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, ClipboardList, Clock, Settings, LogOut } from 'lucide-react';
+import { Home, ClipboardList, Clock, Settings, LogOut, BarChart2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import clsx from 'clsx';
 
@@ -10,6 +10,7 @@ export default function Sidebar() {
     { id: 'garage', icon: Home, label: 'Garage' },
     { id: 'customers', icon: ClipboardList, label: 'Customers' },
     { id: 'history', icon: Clock, label: 'History' },
+    { id: 'analytics', icon: BarChart2, label: 'Analytics' },
   ];
 
   return (

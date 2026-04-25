@@ -23,6 +23,10 @@ export const useStore = create((set) => ({
   activeZone: 'overview', // 'overview' | 'engine' | 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'undercarriage'
   setActiveZone: (zone) => set({ activeZone: zone }),
 
+  // Selected Vehicle (for Garage view before starting session)
+  selectedVehicle: null,
+  selectVehicle: (vehicle) => set({ selectedVehicle: vehicle }),
+
   // Service Session
   currentSession: null,
   startSession: (vehicle, template) => set({ 

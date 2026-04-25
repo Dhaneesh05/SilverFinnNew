@@ -8,7 +8,7 @@ export default function CustomersView() {
   const [search, setSearch] = useState('');
   const token = useStore(state => state.token);
   const setActiveView = useStore(state => state.setActiveView);
-  const startSession = useStore(state => state.startSession);
+  const selectVehicle = useStore(state => state.selectVehicle);
 
   useEffect(() => {
     fetchCustomers();
@@ -32,18 +32,7 @@ export default function CustomersView() {
   };
 
   const handleStartInspection = (vehicle) => {
-    // Basic mock template, in a real scenario we would fetch templates or let the user choose
-    const mockTemplate = {
-      id: 'default-inspection',
-      name: 'Comprehensive Inspection',
-      items: [
-        { id: '1', zone: 'engine', name: 'Engine Oil', description: 'Check level and condition', type: 'PASS_FAIL' },
-        { id: '2', zone: 'engine', name: 'Brake Fluid', description: 'Check level', type: 'PASS_FAIL' },
-        { id: '3', zone: 'front-left', name: 'Tyre Tread', description: 'Check depth', type: 'MEASUREMENT' },
-      ]
-    };
-    
-    startSession(vehicle, mockTemplate);
+    selectVehicle(vehicle);
     setActiveView('garage');
   };
 

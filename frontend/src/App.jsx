@@ -5,6 +5,7 @@ import LoginView from './views/LoginView';
 import CustomersView from './views/CustomersView';
 import HistoryView from './views/HistoryView';
 import SettingsView from './views/SettingsView';
+import AnalyticsView from './views/AnalyticsView';
 import { useStore } from './store/useStore';
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
         {activeView === 'garage' && <GarageView />}
         {activeView === 'customers' && <CustomersView />}
         {activeView === 'history' && <HistoryView />}
+        {activeView === 'analytics' && <AnalyticsView />}
         {activeView === 'settings' && <SettingsView />}
       </main>
     </div>

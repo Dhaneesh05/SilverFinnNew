@@ -83,4 +83,57 @@ router.get('/analytics/service-frequency', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/**
+ * GET /api/predictions/analytics/heatmap
+ * Heatmap data: part replacement frequency across mileage buckets.
+ */
+router.get('/analytics/heatmap', async (req, res, next) => {
+  try {
+    const { make = 'Toyota', model = 'Vios' } = req.query;
+
+    const sessions = await prisma.serviceSession.findMany({
+      where: {
+        workshopId: req.user.workshopId,
+        vehicle: {
+          make: { equals: make, mode: 'insensitive' },
+          model: { equals: model, mode: 'insensitive' }
+        }
+      },
+      include: { replacedParts: true }
+    });
+
+    const buckets = [0, 20000, 40000, 60000, 80000, 100000, 120000];
+    const heatData = [];
+
+    // Initialize data structure
+    const partTypes = ['Brake Pads', 'Spark Plugs', 'Timing Belt', 'Water Pump', 'Battery', 'Engine Oil'];
+    
+    buckets.forEach(mileage => {
+      partTypes.forEach(part => {
+        heatData.push({ mileage, part, count: 0, total: 0 });
+      });
+    });
+
+    sessions.forEach(session => {
+      const bucket = buckets.reduce((prev, curr) => (session.mileageAtVisit >= curr ? curr : prev), 0);
+      partTypes.forEach(part => {
+        const item = heatData.find(d => d.mileage === bucket && d.part === part);
+        if (item) {
+          item.total += 1;
+          if (session.replacedParts.some(p => p.partName.includes(part))) {
+            item.count += 1;
+          }
+        }
+      });
+    });
+
+    const finalData = heatData.map(d => ({
+      ...d,
+      probability: d.total > 0 ? (d.count / d.total) * 100 : 0
+    }));
+
+    res.json(finalData);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
