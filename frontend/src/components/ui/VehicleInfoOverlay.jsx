@@ -43,7 +43,6 @@ export default function VehicleInfoOverlay() {
     setStarting(true);
 
     try {
-      // Create a real session on the backend
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: {
@@ -52,11 +51,16 @@ export default function VehicleInfoOverlay() {
         },
         body: JSON.stringify({
           vehicleId: vehicle.id,
-          mileageAtVisit: vehicle.currentMileage,
+          mileageAtVisit: vehicle.currentMileage || 0,
           serviceType: selectedChecklist.serviceType ?? 'INSPECTION',
           notes: `Inspection started via Silver Finn Garage`
         })
       });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
 
       const session = await res.json();
 

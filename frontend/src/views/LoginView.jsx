@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { Terminal, Lock, User, Loader2 } from 'lucide-react';
 
 export default function LoginView() {
   const login = useStore(state => state.login);
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -25,6 +27,7 @@ export default function LoginView() {
 
       if (response.ok) {
         login(data.token, data.user);
+        navigate('/loading');
       } else {
         setError(data.error || 'Authentication failed');
       }

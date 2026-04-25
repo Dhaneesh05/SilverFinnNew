@@ -74,6 +74,11 @@ export default function CustomersView() {
     setActiveView('garage');
   };
 
+  const handleViewHistory = (vehicle) => {
+    selectVehicle(vehicle);
+    setActiveView('history');
+  };
+
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase()) || 
     c.email?.toLowerCase().includes(search.toLowerCase()) ||
@@ -151,6 +156,7 @@ export default function CustomersView() {
                       
                       <div className="flex gap-2">
                         <button 
+                          onClick={() => handleViewHistory(vehicle)}
                           className="p-2 bg-metallic-900 border border-metallic-700 rounded text-slate-400 hover:text-gold-400 hover:border-gold-500 transition-colors"
                           title="Service History"
                         >

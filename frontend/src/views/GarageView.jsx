@@ -33,9 +33,9 @@ export default function GarageView() {
             
             <OrbitControls 
               makeDefault 
-              minPolarAngle={Math.PI / 4} 
-              maxPolarAngle={Math.PI / 2.1} 
-              minDistance={3} 
+              minPolarAngle={activeZone === 'overview' ? Math.PI / 4 : 0} 
+              maxPolarAngle={activeZone === 'overview' ? Math.PI / 2.1 : Math.PI} 
+              minDistance={activeZone === 'overview' ? 3 : 0.1} 
               maxDistance={10}
               enablePan={false}
               autoRotate={activeZone === 'overview'}

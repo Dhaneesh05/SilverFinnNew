@@ -6,6 +6,35 @@ const { generateAlerts } = require('../services/predictionService');
 const router = express.Router();
 router.use(authenticate);
 
+// GET /api/sessions/all — All sessions for the entire workshop (for HistoryView)
+router.get('/all', async (req, res, next) => {
+  try {
+    const { page = 1, limit = 50 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    const where = { workshopId: req.user.workshopId };
+
+    const [sessions, total] = await Promise.all([
+      prisma.serviceSession.findMany({
+        where,
+        include: {
+          vehicle: { select: { id: true, plateNumber: true, make: true, model: true, year: true } },
+          mechanic: { select: { id: true, name: true, avatarUrl: true } },
+          replacedParts: true,
+          checkItems: {
+            include: { templateItem: { select: { itemName: true, zone: true, category: true } } },
+          },
+        },
+        orderBy: { sessionDate: 'desc' },
+        skip,
+        take: Number(limit),
+      }),
+      prisma.serviceSession.count({ where }),
+    ]);
+
+    res.json({ data: sessions, total, page: Number(page), limit: Number(limit) });
+  } catch (err) { next(err); }
+});
+
 // GET /api/sessions?vehicleId=xxx — All sessions for a vehicle
 router.get('/', async (req, res, next) => {
   try {
@@ -60,7 +89,7 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { vehicleId, mileageAtVisit, serviceType, notes } = req.body;
-    if (!vehicleId || !mileageAtVisit || !serviceType) {
+    if (!vehicleId || mileageAtVisit === undefined || mileageAtVisit === null || !serviceType) {
       return res.status(400).json({ error: 'vehicleId, mileageAtVisit, serviceType required' });
     }
 

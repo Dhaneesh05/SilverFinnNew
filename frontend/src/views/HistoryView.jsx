@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import {
   Calendar, Wrench, Car, Clock, CheckCircle, XCircle,
-  ChevronDown, ChevronRight, Filter, TrendingUp, DollarSign
+  ChevronDown, ChevronRight, Filter, TrendingUp, DollarSign,
+  RefreshCw, Download
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -68,8 +69,11 @@ function SessionCard({ session }) {
               <Car size={11} />
               {session.vehicle?.make} {session.vehicle?.model}
             </span>
+            {session.mileageAtVisit > 0 && (
+              <span>• {session.mileageAtVisit.toLocaleString()} km</span>
+            )}
             {session.mechanic && (
-              <span>by {session.mechanic.name}</span>
+              <span>• by {session.mechanic.name}</span>
             )}
           </div>
         </div>
@@ -148,60 +152,78 @@ function SessionCard({ session }) {
 
 export default function HistoryView() {
   const token = useStore(state => state.token);
+  const selectedVehicle = useStore(state => state.selectedVehicle);
+  const selectVehicle = useStore(state => state.selectVehicle);
+  
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('ALL'); // ALL | MINOR | MAJOR | INSPECTION
   const [totalRevenue, setTotalRevenue] = useState(0);
 
   useEffect(() => {
     fetchAllSessions();
-  }, []);
+  }, [token]);
 
-  const fetchAllSessions = async () => {
+  const fetchAllSessions = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     try {
-      // Fetch recent completed sessions across all vehicles
-      // We'll use the customers endpoint to get all vehicles, then their sessions
-      const res = await fetch('/api/customers?limit=100', {
+      const res = await fetch('/api/sessions/all?limit=100', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error();
-
-      const { data: customers } = await res.json();
-
-      // Collect all vehicle IDs
-      const vehicleIds = customers.flatMap(c => c.vehicles?.map(v => v.id) ?? []);
-
-      // Fetch sessions for each vehicle (in parallel, limit to first 10 vehicles for now)
-      const sessionResults = await Promise.all(
-        vehicleIds.slice(0, 10).map(vid =>
-          fetch(`/api/sessions?vehicleId=${vid}&limit=10`, {
-            headers: { Authorization: `Bearer ${token}` }
-          }).then(r => r.ok ? r.json() : { data: [] })
-        )
-      );
-
-      const allSessions = sessionResults.flatMap(r => r.data ?? []);
-      allSessions.sort((a, b) => new Date(b.sessionDate) - new Date(a.sessionDate));
-
-      setSessions(allSessions);
-      setTotalRevenue(allSessions.reduce((sum, s) => sum + (Number(s.totalCostMyr) || 0), 0));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { data } = await res.json();
+      setSessions(data || []);
+      setTotalRevenue((data || []).reduce((sum, s) => sum + (Number(s.totalCostMyr) || 0), 0));
     } catch (err) {
       console.error('Failed to fetch sessions:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const filteredSessions = filter === 'ALL'
+  let displaySessions = filter === 'ALL'
     ? sessions
     : sessions.filter(s => s.serviceType === filter);
+
+  if (selectedVehicle) {
+    displaySessions = displaySessions.filter(s => s.vehicleId === selectedVehicle.id);
+  }
 
   return (
     <div className="w-full h-full flex flex-col bg-metallic-900 overflow-hidden">
       {/* Header */}
       <div className="flex-shrink-0 p-8 pb-4 border-b border-metallic-800">
-        <h1 className="text-3xl font-display font-bold text-gradient-gold mb-1">Service History</h1>
-        <p className="text-slate-400 text-sm">Complete audit log of all service sessions.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-display font-bold text-gradient-gold mb-1">
+              {selectedVehicle ? `${selectedVehicle.plateNumber} Service History` : 'Service History'}
+            </h1>
+            <p className="text-slate-400 text-sm">
+              {selectedVehicle ? `Audit log for ${selectedVehicle.make} ${selectedVehicle.model}.` : 'Complete audit log of all service sessions.'}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <button
+              onClick={() => fetchAllSessions(true)}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-metallic-800 border border-metallic-700 rounded-xl text-xs font-bold text-slate-400 hover:text-gold-400 hover:border-gold-500/30 transition-all mt-1"
+            >
+              <RefreshCw size={13} className={refreshing ? 'animate-spin text-gold-400' : ''} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+            {selectedVehicle && (
+              <button 
+                onClick={() => selectVehicle(null)}
+                className="text-xs text-sky-400 hover:text-sky-300 underline"
+              >
+                Clear vehicle filter
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Stats Row */}
         <div className="flex gap-6 mt-6">
@@ -260,7 +282,7 @@ export default function HistoryView() {
           <div className="flex items-center justify-center h-48">
             <div className="w-8 h-8 border-4 border-gold-500 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filteredSessions.length === 0 ? (
+        ) : displaySessions.length === 0 ? (
           <div className="text-center py-16 text-slate-500">
             <Wrench size={40} className="mx-auto mb-4 opacity-30" />
             <p>No service sessions found.</p>
@@ -268,7 +290,7 @@ export default function HistoryView() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredSessions.map(session => (
+            {displaySessions.map(session => (
               <SessionCard key={session.id} session={session} />
             ))}
           </div>

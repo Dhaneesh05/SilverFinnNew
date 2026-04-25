@@ -1,17 +1,24 @@
 import React from 'react';
 import { Home, ClipboardList, Clock, Settings, LogOut, BarChart2 } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import clsx from 'clsx';
 
 export default function Sidebar() {
-  const { activeView, setActiveView } = useStore();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const navItems = [
-    { id: 'garage', icon: Home, label: 'Garage' },
-    { id: 'customers', icon: ClipboardList, label: 'Customers' },
-    { id: 'history', icon: Clock, label: 'History' },
-    { id: 'analytics', icon: BarChart2, label: 'Analytics' },
+    { path: '/dashboard/garage', icon: Home, label: 'Garage' },
+    { path: '/dashboard/customers', icon: ClipboardList, label: 'Customers' },
+    { path: '/dashboard/history', icon: Clock, label: 'History' },
+    { path: '/dashboard/analytics', icon: BarChart2, label: 'Analytics' },
   ];
+
+  const handleLogout = () => {
+    useStore.getState().logout();
+    navigate('/login');
+  };
 
   return (
     <div className="w-20 h-full glass-panel flex flex-col items-center py-6 z-50">
@@ -20,13 +27,15 @@ export default function Sidebar() {
         <span className="font-display font-bold text-metallic-900 text-xl">SF</span>
       </div>
 
+
+
       {/* Main Nav */}
       <nav className="flex-1 flex flex-col gap-4 w-full px-4">
         {navItems.map((item) => (
           <button
-            key={item.id}
-            onClick={() => setActiveView(item.id)}
-            className={clsx('nav-item group relative', activeView === item.id && 'active')}
+            key={item.path}
+            onClick={() => navigate(item.path)}
+            className={clsx('nav-item group relative', location.pathname === item.path && 'active')}
             title={item.label}
           >
             <item.icon size={22} className="relative z-10" />
@@ -42,12 +51,12 @@ export default function Sidebar() {
       {/* Bottom Nav */}
       <div className="flex flex-col gap-4 w-full px-4 mt-auto">
         <button 
-          onClick={() => setActiveView('settings')}
-          className={clsx('nav-item', activeView === 'settings' && 'active')}
+          onClick={() => navigate('/dashboard/settings')}
+          className={clsx('nav-item', location.pathname === '/dashboard/settings' && 'active')}
         >
           <Settings size={22} />
         </button>
-        <button onClick={() => useStore.getState().logout()} className="nav-item hover:!text-red-400 hover:!bg-red-500/10">
+        <button onClick={handleLogout} className="nav-item hover:!text-red-400 hover:!bg-red-500/10">
           <LogOut size={22} />
         </button>
       </div>
