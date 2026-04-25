@@ -3,80 +3,78 @@ const path = require('path');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const { ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings } = require("@langchain/google-genai");
-const { Document } = require("@langchain/core/documents");
-const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
+const { ChatGoogleGenerativeAI } = require("@langchain/google-genai");
 
-let localDocs = [];
-let isVectorStoreInitialized = false;
+// In-memory store: plain text chunks, no embeddings needed
+let manualChunks = [];
+let isStoreInitialized = false;
 
-function cosineSimilarity(vecA, vecB) {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
+// Simple keyword-based scorer (BM25-lite): counts matching words
+function keywordScore(text, query) {
+  const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const textLower = text.toLowerCase();
+  let score = 0;
+  for (const word of queryWords) {
+    const matches = textLower.split(word).length - 1;
+    score += matches;
   }
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  return score;
 }
 
-// Initialize the custom in-memory store from the .txt files
-async function initVectorStore() {
-  if (isVectorStoreInitialized) return;
+// Load all txt files into memory as plain text chunks (no API calls needed)
+function initManualStore() {
+  if (isStoreInitialized) return;
   try {
     const manualsPath = path.join(__dirname, '../../car_manuals');
     if (!fs.existsSync(manualsPath)) {
       fs.mkdirSync(manualsPath, { recursive: true });
     }
 
-    const files = fs.readdirSync(manualsPath).filter(file => file.endsWith('.txt'));
-    
-    let docs = [];
+    const files = fs.readdirSync(manualsPath).filter(f => f.endsWith('.txt'));
+    manualChunks = [];
+
     for (const file of files) {
       const text = fs.readFileSync(path.join(manualsPath, file), 'utf8');
-      docs.push(new Document({ pageContent: text, metadata: { source: file } }));
+      // Split into paragraphs/sections for better retrieval
+      const sections = text.split(/\n\n+/).filter(s => s.trim().length > 20);
+      for (const section of sections) {
+        manualChunks.push({ text: section.trim(), source: file });
+      }
     }
 
-    if (docs.length > 0) {
-      const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 500, chunkOverlap: 50 });
-      const splitDocs = await textSplitter.splitDocuments(docs);
-      
-      const embeddings = new GoogleGenerativeAIEmbeddings({
-        model: "gemini-embedding-2",
-        apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
-      });
-
-      const vectors = await embeddings.embedDocuments(splitDocs.map(d => d.pageContent));
-      
-      localDocs = splitDocs.map((doc, i) => ({
-        text: doc.pageContent,
-        vector: vectors[i]
-      }));
-      
-      console.log(`Initialized custom vector store with ${splitDocs.length} chunks from ${files.length} files.`);
-    } else {
-      console.log("No .txt files found in car_manuals directory.");
-    }
+    console.log(`Loaded ${manualChunks.length} manual sections from ${files.length} files.`);
   } catch (err) {
-    console.error("Failed to initialize vector store:", err);
+    console.error("Failed to load manuals:", err.message);
   } finally {
-    isVectorStoreInitialized = true;
+    isStoreInitialized = true;
   }
 }
 
-// Call it eagerly in the background when the file is loaded
-initVectorStore();
+// Call on startup (synchronous, no API calls)
+initManualStore();
+
+// Retrieve top-k most relevant sections using keyword matching
+function retrieveRelevantContext(query, topK = 5) {
+  if (manualChunks.length === 0) return "";
+
+  const scored = manualChunks.map(chunk => ({
+    text: chunk.text,
+    score: keywordScore(chunk.text, query)
+  }));
+
+  scored.sort((a, b) => b.score - a.score);
+  const topChunks = scored.filter(c => c.score > 0).slice(0, topK);
+
+  if (topChunks.length === 0) return "";
+  return "\nRelevant Manual Sections:\n" + topChunks.map(c => c.text).join("\n\n");
+}
 
 async function processChat(vehicleId, workshopId, userMessage, chatHistory = []) {
-  // Ensure initialized
-  if (!isVectorStoreInitialized) await initVectorStore();
+  if (!isStoreInitialized) initManualStore();
 
   let vehicleContext = "";
-  let manualContext = "";
 
-  // 1. Gather Internal Context (Mini-RAG)
+  // 1. Gather vehicle context from DB
   if (vehicleId) {
     try {
       const vehicle = await prisma.vehicle.findUnique({
@@ -91,38 +89,17 @@ async function processChat(vehicleId, workshopId, userMessage, chatHistory = [])
         }
       }
     } catch (e) {
-      console.error("DB Context Error:", e);
+      console.error("DB Context Error:", e.message);
     }
   }
 
-  // 2. Gather External Knowledge (Custom In-Memory RAG)
-  if (localDocs.length > 0) {
-    try {
-      const embeddings = new GoogleGenerativeAIEmbeddings({
-        model: "gemini-embedding-2",
-        apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
-      });
-      const queryVector = await embeddings.embedQuery(userMessage);
-      
-      const scoredDocs = localDocs.map(doc => ({
-        text: doc.text,
-        score: cosineSimilarity(queryVector, doc.vector)
-      }));
-      
-      scoredDocs.sort((a, b) => b.score - a.score);
-      const topDocs = scoredDocs.slice(0, 3);
-      
-      if (topDocs.length > 0) {
-        manualContext = "\nRelevant Manual Excerpts:\n" + topDocs.map(d => d.text).join("\n\n");
-      }
-    } catch (err) {
-      console.error("Error searching vector store:", err);
-    }
-  }
+  // 2. Retrieve relevant manual context (no API calls!)
+  const manualContext = retrieveRelevantContext(userMessage);
 
   const systemPrompt = `You are Silver Finn AI, an expert automotive technician assistant powered by Google Gemini 2.0.
-You provide concise, highly technical advice to mechanics.
+You provide concise, highly technical advice to mechanics and workshop advisors.
 Always use metric units and specify torque settings or exact specifications when possible.
+If asked about a specific car model, refer to the manual sections provided.
 
 Current Vehicle Context:
 ${vehicleContext || "No specific vehicle selected."}
@@ -132,18 +109,18 @@ Answer the following user query professionally.`;
 
   const API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
   if (!API_KEY) {
-    return `[MOCK AI RESPONSE]\nContext used: ${vehicleContext ? 'Yes' : 'No'}\nManuals used: ${manualContext ? 'Yes' : 'No'}\nNo GOOGLE_API_KEY found in .env!`;
+    return `[MOCK] No GOOGLE_API_KEY found in .env!`;
   }
 
   const messages = [
     { role: "system", content: systemPrompt },
     ...chatHistory,
     { role: "user", content: userMessage }
-  ].map(msg => [msg.role, msg.content]);
+  ].map(msg => [msg.role === "system" ? "user" : msg.role, msg.content]);
 
   try {
     const chat = new ChatGoogleGenerativeAI({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.0-flash-lite",
       temperature: 0.3,
       apiKey: API_KEY,
       maxRetries: 0
@@ -152,7 +129,7 @@ Answer the following user query professionally.`;
     const response = await chat.invoke(messages);
     return response.content;
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini API Error:", error.message);
     throw new Error(error.message || "Gemini API Error");
   }
 }
