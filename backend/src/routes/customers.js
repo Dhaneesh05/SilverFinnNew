@@ -25,7 +25,7 @@ router.get('/', async (req, res, next) => {
     const [customers, total] = await Promise.all([
       prisma.customer.findMany({
         where,
-        include: { vehicles: { select: { id: true, make: true, model: true, year: true, plateNumber: true, glbModelKey: true } } },
+        include: { vehicles: { select: { id: true, make: true, model: true, year: true, plateNumber: true, glbModelKey: true, currentMileage: true } } },
         orderBy: { name: 'asc' },
         skip,
         take: Number(limit),

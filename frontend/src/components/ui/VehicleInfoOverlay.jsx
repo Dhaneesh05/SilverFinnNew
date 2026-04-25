@@ -140,6 +140,20 @@ export default function VehicleInfoOverlay() {
                 type="number" 
                 value={editableMileage}
                 onChange={e => setEditableMileage(Number(e.target.value))}
+                onBlur={async () => {
+                  if (!vehicle || editableMileage === vehicle.currentMileage) return;
+                  try {
+                    await fetch(`/api/vehicles/${vehicle.id}`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                      },
+                      body: JSON.stringify({ currentMileage: editableMileage })
+                    });
+                    useStore.getState().selectVehicle({ ...vehicle, currentMileage: editableMileage });
+                  } catch(e) {}
+                }}
                 className="bg-metallic-800 border border-metallic-600 rounded px-2 py-1 text-right text-sm font-bold text-white font-mono w-24 focus:outline-none focus:border-gold-500"
               />
               <span className="text-sm font-bold text-slate-400 font-mono">km</span>
