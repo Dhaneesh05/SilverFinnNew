@@ -27,6 +27,43 @@ export default function VehicleInfoOverlay() {
       .catch(() => {});
   }, [token]);
 
+  const [editableMileage, setEditableMileage] = useState(0);
+  const [previousMileage, setPreviousMileage] = useState(null);
+  const [predictions, setPredictions] = useState([]);
+
+  useEffect(() => {
+    if (vehicle) setEditableMileage(vehicle.currentMileage || 0);
+  }, [vehicle]);
+
+  // Fetch previous history
+  useEffect(() => {
+    if (!vehicle || !token) return;
+    fetch(`/api/vehicles/${vehicle.id}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(data => {
+        if (data.sessions && data.sessions.length > 0) {
+          setPreviousMileage(data.sessions[0].mileageAtVisit);
+        }
+      });
+  }, [vehicle, token]);
+
+  // Fetch predictions based on entered mileage
+  useEffect(() => {
+    if (!vehicle || !token) return;
+    const timer = setTimeout(() => {
+      fetch(`/api/predictions/${vehicle.id}?mileage=${editableMileage}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.predictions) setPredictions(data.predictions);
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [vehicle, token, editableMileage]);
+
+  const highRiskParts = predictions.filter(p => p.probability > 0.3); // >30% probability
+
   const handleStartInspection = async () => {
     if (!vehicle || !selectedChecklist) return;
     setStarting(true);
@@ -40,7 +77,7 @@ export default function VehicleInfoOverlay() {
         },
         body: JSON.stringify({
           vehicleId: vehicle.id,
-          mileageAtVisit: vehicle.currentMileage || 0,
+          mileageAtVisit: editableMileage,
           serviceType: selectedChecklist.serviceType ?? 'INSPECTION',
           notes: `Inspection started via Silver Finn Garage`
         })
@@ -93,14 +130,39 @@ export default function VehicleInfoOverlay() {
           </div>
         </div>
 
-        <div className="flex justify-between items-center mt-3 p-3 bg-metallic-900/50 rounded-xl border border-metallic-700/50">
-          <span className="text-xs text-slate-500 uppercase font-semibold tracking-wider flex items-center gap-1.5">
-            <Gauge size={12} /> Odometer
-          </span>
-          <span className="text-sm font-bold text-white font-mono">
-            {(vehicle.currentMileage ?? 0).toLocaleString()} km
-          </span>
+        <div className="flex flex-col gap-1 mt-3">
+          <div className="flex justify-between items-center p-3 bg-metallic-900/50 rounded-xl border border-metallic-700/50">
+            <span className="text-xs text-slate-500 uppercase font-semibold tracking-wider flex items-center gap-1.5">
+              <Gauge size={12} /> ODOMETER
+            </span>
+            <div className="flex items-center gap-1">
+              <input 
+                type="number" 
+                value={editableMileage}
+                onChange={e => setEditableMileage(Number(e.target.value))}
+                className="bg-metallic-800 border border-metallic-600 rounded px-2 py-1 text-right text-sm font-bold text-white font-mono w-24 focus:outline-none focus:border-gold-500"
+              />
+              <span className="text-sm font-bold text-slate-400 font-mono">km</span>
+            </div>
+          </div>
+          {previousMileage !== null && (
+            <div className="text-[10px] text-right text-slate-500 pr-1">
+              Previous Service: {previousMileage.toLocaleString()} km
+            </div>
+          )}
         </div>
+        
+        {highRiskParts.length > 0 && (
+          <div className="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-xl flex items-start gap-2">
+            <AlertTriangle size={16} className="text-red-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-red-400">High Risk of Failure</p>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                {highRiskParts.map(p => p.partName).join(', ')} may require replacement soon based on current mileage.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
 

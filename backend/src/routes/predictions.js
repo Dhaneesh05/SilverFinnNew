@@ -18,10 +18,11 @@ router.get('/:vehicleId', async (req, res, next) => {
     });
     if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
 
-    const predictions = await getPredictions(vehicle.make, vehicle.model, vehicle.currentMileage);
+    const overrideMileage = req.query.mileage ? Number(req.query.mileage) : vehicle.currentMileage;
+    const predictions = await getPredictions(vehicle.make, vehicle.model, overrideMileage);
 
     res.json({
-      vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, currentMileage: vehicle.currentMileage },
+      vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, currentMileage: overrideMileage },
       predictions,
       generatedAt: new Date().toISOString(),
     });

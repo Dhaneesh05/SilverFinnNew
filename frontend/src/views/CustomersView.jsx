@@ -151,6 +151,7 @@ export default function CustomersView() {
                         <div>
                           <div className="font-mono font-bold text-slate-200">{vehicle.plateNumber}</div>
                           <div className="text-xs text-slate-400">{vehicle.make} {vehicle.model} ({vehicle.year})</div>
+                          <div className="text-xs text-gold-400 mt-0.5">{(vehicle.currentMileage ?? 0).toLocaleString()} km</div>
                         </div>
                       </div>
                       
