@@ -20,8 +20,9 @@ export default function CustomersView() {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
-        const data = await res.json();
-        setCustomers(data);
+        const json = await res.json();
+        // Backend returns { data: [...], total, page, limit }
+        setCustomers(Array.isArray(json) ? json : (json.data ?? []));
       }
     } catch (err) {
       console.error('Failed to fetch customers:', err);
@@ -49,7 +50,7 @@ export default function CustomersView() {
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase()) || 
     c.email?.toLowerCase().includes(search.toLowerCase()) ||
-    c.vehicles?.some(v => v.plate.toLowerCase().includes(search.toLowerCase()))
+    c.vehicles?.some(v => v.plateNumber?.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -116,7 +117,7 @@ export default function CustomersView() {
                           <Car size={18} className="text-slate-300" />
                         </div>
                         <div>
-                          <div className="font-mono font-bold text-slate-200">{vehicle.plate}</div>
+                          <div className="font-mono font-bold text-slate-200">{vehicle.plateNumber}</div>
                           <div className="text-xs text-slate-400">{vehicle.make} {vehicle.model} ({vehicle.year})</div>
                         </div>
                       </div>
