@@ -7,7 +7,7 @@ import clsx from 'clsx';
 
 // Camera positions and look targets for each inspection zone
 const ZONE_CAMERAS = {
-  'overview':      { pos: new THREE.Vector3(5, 3, 5),      target: new THREE.Vector3(0, 0.5, 0)   },
+  'overview':      { pos: new THREE.Vector3(5.5, 1.0, 5.5), target: new THREE.Vector3(0, 1.0, 0)   },
   'engine':        { pos: new THREE.Vector3(0, 2.5, 3.5),  target: new THREE.Vector3(0, 1, 1.5)   },
   'front-left':    { pos: new THREE.Vector3(-3, 1.5, 2),   target: new THREE.Vector3(-1, 0.5, 1)  },
   'front-right':   { pos: new THREE.Vector3(3, 1.5, 2),    target: new THREE.Vector3(1, 0.5, 1)   },
