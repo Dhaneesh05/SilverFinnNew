@@ -101,4 +101,7 @@ CONTRIBUTING
 ================================================================================
 Contributions, issues, and feature requests are welcome!
 
+The Video Presentation Link:
+https://drive.google.com/drive/folders/1oJ7kpkgNQqk_GVwdk7DMD4zoCMEg5eHx?usp=sharing 
+
 Developed with care during the UM Hackathon 2026.
