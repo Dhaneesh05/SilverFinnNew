@@ -1,0 +1,25 @@
+---
+Vehicle: Toyota Supra A80 (1993)
+Category: Fluids & Torque Specs
+---
+
+# Engine Oil
+- 2JZ-GTE 3.0L Twin Turbo Engine
+- Capacity: 5.2 Liters (with filter change)
+- Recommended Viscosity: 5W-30 or 10W-30
+- Drain Plug Torque: 39 Nm
+
+# Transmission
+- V160 6-Speed Manual (Getrag)
+- Fluid Capacity: 1.8 Liters
+- Recommended Fluid: Toyota V160 Fluid
+
+# Brakes
+- Front Caliper Bolts Torque: 118 Nm
+- Rear Caliper Bolts Torque: 104 Nm
+- Brake Fluid: DOT 3 or DOT 4
+
+# Wheels
+- Lug Nut Torque: 103 Nm
+- Tire Pressure (Front): 36 PSI
+- Tire Pressure (Rear): 36 PSI

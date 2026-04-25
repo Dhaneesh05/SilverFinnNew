@@ -1,0 +1,25 @@
+---
+Vehicle: BMW M3 E30 (1990)
+Category: Fluids & Torque Specs
+---
+
+# Engine Oil
+- S14 2.3L Engine
+- Capacity: 4.25 Liters (with filter change)
+- Recommended Viscosity: 15W-50 or 20W-50
+- Drain Plug Torque: 33 Nm
+
+# Transmission
+- Getrag 265 5-Speed Manual
+- Fluid Capacity: 1.25 Liters
+- Recommended Fluid: Red Line MTL or MT-90
+
+# Brakes
+- Front Caliper Bolts Torque: 110 Nm
+- Rear Caliper Bolts Torque: 67 Nm
+- Brake Fluid: DOT 4
+
+# Wheels
+- Lug Nut Torque: 110 Nm
+- Tire Pressure (Front): 32 PSI
+- Tire Pressure (Rear): 34 PSI

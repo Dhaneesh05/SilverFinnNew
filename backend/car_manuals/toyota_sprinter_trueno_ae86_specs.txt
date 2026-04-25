@@ -1,0 +1,25 @@
+---
+Vehicle: Toyota Sprinter Trueno AE86 (1985)
+Category: Fluids & Torque Specs
+---
+
+# Engine Oil
+- 4A-GE 1.6L Engine
+- Capacity: 3.3 Liters (with filter change)
+- Recommended Viscosity: 10W-30 or 10W-40
+- Drain Plug Torque: 25 Nm
+
+# Transmission
+- T50 5-Speed Manual
+- Fluid Capacity: 1.7 Liters
+- Recommended Fluid: GL-4 75W-90 Gear Oil
+
+# Brakes
+- Front Caliper Bolts Torque: 90 Nm
+- Rear Caliper Bolts Torque: 45 Nm
+- Brake Fluid: DOT 3
+
+# Wheels
+- Lug Nut Torque: 103 Nm
+- Tire Pressure (Front): 28 PSI (Unloaded)
+- Tire Pressure (Rear): 28 PSI (Unloaded)

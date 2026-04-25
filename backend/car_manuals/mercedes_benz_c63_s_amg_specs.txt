@@ -1,0 +1,24 @@
+---
+Vehicle: Mercedes-Benz C63 S AMG (2019)
+Category: Fluids & Torque Specs
+---
+
+# Engine Oil
+- Capacity: 9.0 Liters (with filter change)
+- Recommended Viscosity: 0W-40 or 5W-40 Fully Synthetic (MB 229.5 or MB 229.51)
+- Drain Plug Torque: 30 Nm
+
+# Transmission
+- AMG SPEEDSHIFT MCT 9-Speed
+- Fluid Capacity: 9.0 Liters
+- Recommended Fluid: MB 236.15
+
+# Brakes
+- Front Caliper Bolts Torque: 115 Nm
+- Rear Caliper Bolts Torque: 35 Nm + 45 degrees
+- Brake Fluid: DOT 4 Plus, replace every 2 years
+
+# Wheels
+- Lug Nut Torque: 150 Nm
+- Tire Pressure (Front): 36 PSI (Unloaded)
+- Tire Pressure (Rear): 36 PSI (Unloaded)
