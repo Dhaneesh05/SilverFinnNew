@@ -34,36 +34,47 @@ router.get('/:vehicleId', async (req, res, next) => {
  */
 router.get('/analytics/top-parts', async (req, res, next) => {
   try {
-    const { make, model, limit = 10 } = req.query;
-
-    // Raw aggregation: count replaced parts grouped by partName
-    const results = await prisma.replacedPart.groupBy({
-      by: ['partName', 'category'],
-      where: {
-        session: {
-          workshopId: req.user.workshopId,
-          ...(make || model
-            ? {
-                vehicle: {
-                  ...(make && { make: { contains: make, mode: 'insensitive' } }),
-                  ...(model && { model: { contains: model, mode: 'insensitive' } }),
-                },
-              }
-            : {}),
-        },
-      },
-      _count: { partName: true },
-      _avg: { costMyr: true },
-      orderBy: { _count: { partName: 'desc' } },
-      take: Number(limit),
-    });
-
-    res.json(results.map((r) => ({
-      partName: r.partName,
-      category: r.category,
-      count: r._count.partName,
-      avgCostMyr: r._avg.costMyr ? Number(r._avg.costMyr).toFixed(2) : null,
-    })));
+    const fs = require('fs');
+    const path = require('path');
+    const csvPath = path.join(__dirname, '../../../mock_parts_dataset.csv');
+    
+    if (fs.existsSync(csvPath)) {
+      const csvData = fs.readFileSync(csvPath, 'utf8');
+      const lines = csvData.split('\n').filter(l => l.trim().length > 0);
+      
+      const partStats = {};
+      
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(',');
+        if (row.length < 6) continue;
+        
+        const partName = row[1].replace(/"/g, '');
+        const category = row[2].replace(/"/g, '');
+        const mileage = parseInt(row[3], 10);
+        const wasBroken = row[4].replace(/"/g, '') === 'Yes';
+        
+        if (!partStats[partName]) {
+          partStats[partName] = { part: partName, category, totalMileage: 0, frequency: 0, brokenCount: 0 };
+        }
+        
+        partStats[partName].totalMileage += mileage;
+        partStats[partName].frequency += 1;
+        if (wasBroken) partStats[partName].brokenCount += 1;
+      }
+      
+      const results = Object.values(partStats).map(p => ({
+        part: p.part,
+        category: p.category,
+        mileage: Math.round(p.totalMileage / p.frequency),
+        frequency: p.frequency,
+        failureProb: Math.round((p.brokenCount / p.frequency) * 100)
+      })).sort((a, b) => b.frequency - a.frequency);
+      
+      return res.json(results);
+    }
+    
+    // Fallback if no CSV
+    return res.json([]);
   } catch (err) { next(err); }
 });
 
@@ -73,66 +84,55 @@ router.get('/analytics/top-parts', async (req, res, next) => {
  */
 router.get('/analytics/service-frequency', async (req, res, next) => {
   try {
-    const results = await prisma.vehicle.groupBy({
-      by: ['make', 'model'],
+    // Fetch all sessions to correspond with the history page
+    const sessions = await prisma.serviceSession.findMany({
       where: { workshopId: req.user.workshopId },
-      _count: { id: true },
-      orderBy: { _count: { id: 'desc' } },
+      include: { vehicle: true }
     });
-    res.json(results.map((r) => ({ make: r.make, model: r.model, vehicleCount: r._count.id })));
+    
+    const freq = {};
+    sessions.forEach(s => {
+      if (s.vehicle) {
+        const key = `${s.vehicle.make}|${s.vehicle.model}`;
+        freq[key] = (freq[key] || 0) + 1;
+      }
+    });
+    
+    const results = Object.entries(freq).map(([key, count]) => {
+      const [make, model] = key.split('|');
+      return { make, model, vehicleCount: count };
+    }).sort((a, b) => b.vehicleCount - a.vehicleCount);
+    
+    res.json(results);
   } catch (err) { next(err); }
 });
 
 /**
- * GET /api/predictions/analytics/heatmap
- * Heatmap data: part replacement frequency across mileage buckets.
+ * GET /api/predictions/analytics/inspection-failures
+ * Top failed inspection items across the workshop.
  */
-router.get('/analytics/heatmap', async (req, res, next) => {
+router.get('/analytics/inspection-failures', async (req, res, next) => {
   try {
-    const { make = 'Toyota', model = 'Vios' } = req.query;
-
-    const sessions = await prisma.serviceSession.findMany({
+    const checkItems = await prisma.checkItem.findMany({
       where: {
-        workshopId: req.user.workshopId,
-        vehicle: {
-          make: { equals: make, mode: 'insensitive' },
-          model: { equals: model, mode: 'insensitive' }
-        }
+        result: 'FAIL',
+        session: { workshopId: req.user.workshopId }
       },
-      include: { replacedParts: true }
+      include: { templateItem: true }
     });
 
-    const buckets = [0, 20000, 40000, 60000, 80000, 100000, 120000];
-    const heatData = [];
-
-    // Initialize data structure
-    const partTypes = ['Brake Pads', 'Spark Plugs', 'Timing Belt', 'Water Pump', 'Battery', 'Engine Oil'];
-    
-    buckets.forEach(mileage => {
-      partTypes.forEach(part => {
-        heatData.push({ mileage, part, count: 0, total: 0 });
-      });
+    const failures = {};
+    checkItems.forEach(item => {
+      const name = item.templateItem?.itemName || 'Unknown Item';
+      failures[name] = (failures[name] || 0) + 1;
     });
 
-    sessions.forEach(session => {
-      const bucket = buckets.reduce((prev, curr) => (session.mileageAtVisit >= curr ? curr : prev), 0);
-      partTypes.forEach(part => {
-        const item = heatData.find(d => d.mileage === bucket && d.part === part);
-        if (item) {
-          item.total += 1;
-          if (session.replacedParts.some(p => p.partName.includes(part))) {
-            item.count += 1;
-          }
-        }
-      });
-    });
+    const results = Object.entries(failures)
+      .map(([item, failCount]) => ({ item, failCount }))
+      .sort((a, b) => b.failCount - a.failCount)
+      .slice(0, 5); // top 5
 
-    const finalData = heatData.map(d => ({
-      ...d,
-      probability: d.total > 0 ? (d.count / d.total) * 100 : 0
-    }));
-
-    res.json(finalData);
+    res.json(results);
   } catch (err) { next(err); }
 });
 

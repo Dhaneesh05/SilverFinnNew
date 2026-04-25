@@ -4,7 +4,6 @@ import { useStore } from '../../store/useStore';
 
 export default function VehicleInfoOverlay() {
   const { currentSession, startSession, endSession, token, selectedVehicle } = useStore();
-  const [alerts, setAlerts] = useState([]);
   const [checklists, setChecklists] = useState([]);
   const [selectedChecklist, setSelectedChecklist] = useState(null);
   const [showChecklistPicker, setShowChecklistPicker] = useState(false);
@@ -12,16 +11,6 @@ export default function VehicleInfoOverlay() {
 
   const vehicle = currentSession?.vehicle || selectedVehicle;
 
-  // Fetch alerts for the active vehicle
-  useEffect(() => {
-    if (!vehicle?.id || !token) return;
-    fetch(`/api/alerts?vehicleId=${vehicle.id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setAlerts(Array.isArray(data) ? data : []))
-      .catch(() => setAlerts([]));
-  }, [vehicle?.id, token]);
 
   // Fetch available checklist templates
   useEffect(() => {
@@ -114,26 +103,6 @@ export default function VehicleInfoOverlay() {
         </div>
       </div>
 
-      {/* AI Predictive Alerts */}
-      {alerts.length > 0 && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle size={16} className="text-red-400" />
-            <h3 className="text-sm font-bold text-red-400">AI Predictive Alerts</h3>
-          </div>
-          <div className="space-y-1">
-            {alerts.slice(0, 3).map(a => (
-              <div key={a.id} className="text-xs text-red-200/80 flex justify-between">
-                <span>{a.alertType.replace(/_/g, ' ')}</span>
-                <span className="font-mono">{Math.round(a.probability * 100)}% prob.</span>
-              </div>
-            ))}
-            {alerts.length > 3 && (
-              <div className="text-xs text-red-300/60 mt-1">+{alerts.length - 3} more alerts</div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Action Buttons */}
       {!currentSession?.backendSessionId ? (

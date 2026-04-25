@@ -77,7 +77,7 @@ export default function AIChatBot() {
               </div>
               <div>
                 <h3 className="font-display font-bold text-white tracking-wide text-sm">Silver Finn AI</h3>
-                <p className="text-[10px] text-gold-400 font-semibold tracking-widest uppercase">Zhipu GLM-4 Powered</p>
+                <p className="text-[10px] text-gold-400 font-semibold tracking-widest uppercase">Gemini 2.0 Powered</p>
               </div>
             </div>
             <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white transition-colors">

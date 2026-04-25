@@ -1,14 +1,61 @@
+const fs = require('fs');
+const path = require('path');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { Chroma } = require("@langchain/community/vectorstores/chroma");
 
-// Dummy embedder so we can connect to Chroma without a real key
-class ZhipuEmbeddings {
-  async embedDocuments(texts) { return texts.map(() => new Array(1536).fill(Math.random())); }
-  async embedQuery(text) { return new Array(1536).fill(Math.random()); }
+const { ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings } = require("@langchain/google-genai");
+const { MemoryVectorStore } = require("langchain/vectorstores/memory");
+const { Document } = require("@langchain/core/documents");
+const { RecursiveCharacterTextSplitter } = require("langchain/text_splitter");
+
+let vectorStore = null;
+let isVectorStoreInitialized = false;
+
+// Initialize the local MemoryVectorStore from the .txt files
+async function initVectorStore() {
+  if (isVectorStoreInitialized) return;
+  try {
+    const manualsPath = path.join(__dirname, '../../car_manuals');
+    if (!fs.existsSync(manualsPath)) {
+      fs.mkdirSync(manualsPath, { recursive: true });
+    }
+
+    const files = fs.readdirSync(manualsPath).filter(file => file.endsWith('.txt'));
+    
+    let docs = [];
+    for (const file of files) {
+      const text = fs.readFileSync(path.join(manualsPath, file), 'utf8');
+      docs.push(new Document({ pageContent: text, metadata: { source: file } }));
+    }
+
+    if (docs.length > 0) {
+      const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 500, chunkOverlap: 50 });
+      const splitDocs = await textSplitter.splitDocuments(docs);
+      
+      const embeddings = new GoogleGenerativeAIEmbeddings({
+        model: "text-embedding-004",
+        apiKey: process.env.GEMINI_API_KEY
+      });
+
+      vectorStore = await MemoryVectorStore.fromDocuments(splitDocs, embeddings);
+      console.log(`Initialized MemoryVectorStore with ${splitDocs.length} chunks from ${files.length} files.`);
+    } else {
+      console.log("No .txt files found in car_manuals directory.");
+    }
+  } catch (err) {
+    console.error("Failed to initialize vector store:", err);
+  } finally {
+    isVectorStoreInitialized = true;
+  }
 }
 
+// Call it eagerly in the background when the file is loaded
+initVectorStore();
+
 async function processChat(vehicleId, workshopId, userMessage, chatHistory = []) {
+  // Ensure initialized
+  if (!isVectorStoreInitialized) await initVectorStore();
+
   let vehicleContext = "";
   let manualContext = "";
 
@@ -31,23 +78,19 @@ async function processChat(vehicleId, workshopId, userMessage, chatHistory = [])
     }
   }
 
-  // 2. Gather External Knowledge (ChromaDB Full RAG)
-  try {
-    const vectorStore = await Chroma.fromExistingCollection(new ZhipuEmbeddings(), {
-      collectionName: "workshop_manuals",
-      url: "http://localhost:8000"
-    });
-    
-    // Search vector store for relevant chunks
-    const results = await vectorStore.similaritySearch(userMessage, 2);
-    if (results && results.length > 0) {
-      manualContext = "\nRelevant Manual Excerpts:\n" + results.map(r => r.pageContent).join("\n");
+  // 2. Gather External Knowledge (MemoryVectorStore RAG)
+  if (vectorStore) {
+    try {
+      const results = await vectorStore.similaritySearch(userMessage, 3);
+      if (results && results.length > 0) {
+        manualContext = "\nRelevant Manual Excerpts:\n" + results.map(r => r.pageContent).join("\n\n");
+      }
+    } catch (err) {
+      console.error("Error searching vector store:", err);
     }
-  } catch (error) {
-    console.warn("ChromaDB not available or manual collection missing. Skipping external manual retrieval.");
   }
 
-  const systemPrompt = `You are Silver Finn AI, an expert automotive technician assistant.
+  const systemPrompt = `You are Silver Finn AI, an expert automotive technician assistant powered by Google Gemini 2.0.
 You provide concise, highly technical advice to mechanics.
 Always use metric units and specify torque settings or exact specifications when possible.
 
@@ -57,36 +100,30 @@ ${manualContext}
 
 Answer the following user query professionally.`;
 
-  const payload = {
-    model: "glm-4",
-    messages: [
-      { role: "system", content: systemPrompt },
-      ...chatHistory,
-      { role: "user", content: userMessage }
-    ],
-    temperature: 0.3
-  };
-
-  const API_KEY = process.env.ZHIPUAI_API_KEY || 'dummy_key';
-  
-  // If no real key, mock the response
-  if (API_KEY === 'dummy_key') {
-    return `[MOCK AI RESPONSE]\nContext used: ${vehicleContext ? 'Yes' : 'No'}\nManuals used: ${manualContext ? 'Yes' : 'No'}\nI am currently operating in test mode without a ZhipuAI key. For "${userMessage}", I would normally analyze the DB history and ChromaDB manuals.`;
+  const API_KEY = process.env.GEMINI_API_KEY;
+  if (!API_KEY) {
+    return `[MOCK AI RESPONSE]\nContext used: ${vehicleContext ? 'Yes' : 'No'}\nManuals used: ${manualContext ? 'Yes' : 'No'}\nNo GEMINI_API_KEY found in .env!`;
   }
 
-  const response = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${API_KEY}`
-    },
-    body: JSON.stringify(payload)
-  });
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...chatHistory,
+    { role: "user", content: userMessage }
+  ].map(msg => [msg.role, msg.content]);
 
-  const data = await response.json();
-  if (data.error) throw new Error(data.error.message || "ZhipuAI API Error");
+  try {
+    const chat = new ChatGoogleGenerativeAI({
+      model: "gemini-2.0-flash",
+      temperature: 0.3,
+      apiKey: API_KEY,
+    });
 
-  return data.choices[0].message.content;
+    const response = await chat.invoke(messages);
+    return response.content;
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    throw new Error(error.message || "Gemini API Error");
+  }
 }
 
 module.exports = { processChat };

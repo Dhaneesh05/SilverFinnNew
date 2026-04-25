@@ -158,7 +158,7 @@ export default function SettingsView() {
             </div>
             <div className="flex justify-between py-2 border-b border-metallic-700/30">
               <span className="text-slate-400">AI Engine</span>
-              <span className="text-slate-200 font-mono">ZhipuAI GLM-4</span>
+              <span className="text-slate-200 font-mono">Google Gemini 2.0 Flash</span>
             </div>
             <div className="flex justify-between py-2 border-b border-metallic-700/30">
               <span className="text-slate-400">Database</span>

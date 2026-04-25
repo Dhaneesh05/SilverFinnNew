@@ -1,0 +1,24 @@
+---
+Vehicle: Audi RS7 Sportback
+Category: Fluids & Torque Specs
+---
+
+# Engine Oil
+- Capacity: 9.3 Liters (with filter change)
+- Recommended Viscosity: 0W-40 or 5W-40 Fully Synthetic (VW 511.00 standard)
+- Drain Plug Torque: 30 Nm
+
+# Transmission
+- ZF 8-Speed Automatic
+- Fluid Capacity: 8.5 Liters (dry fill)
+- Recommended Fluid: Audi G 060 162 A2
+
+# Brakes
+- Front Caliper Bolts Torque: 196 Nm
+- Rear Caliper Bolts Torque: 35 Nm + 90 degrees
+- Brake Fluid: DOT 4, replace every 2 years
+
+# Wheels
+- Lug Nut Torque: 120 Nm
+- Tire Pressure (Front): 41 PSI (Unloaded)
+- Tire Pressure (Rear): 38 PSI (Unloaded)
