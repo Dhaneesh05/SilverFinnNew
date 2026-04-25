@@ -4,14 +4,25 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const { ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings } = require("@langchain/google-genai");
-const { MemoryVectorStore } = require("langchain/vectorstores/memory");
 const { Document } = require("@langchain/core/documents");
-const { RecursiveCharacterTextSplitter } = require("langchain/text_splitter");
+const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
 
-let vectorStore = null;
+let localDocs = [];
 let isVectorStoreInitialized = false;
 
-// Initialize the local MemoryVectorStore from the .txt files
+function cosineSimilarity(vecA, vecB) {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+// Initialize the custom in-memory store from the .txt files
 async function initVectorStore() {
   if (isVectorStoreInitialized) return;
   try {
@@ -37,8 +48,14 @@ async function initVectorStore() {
         apiKey: process.env.GEMINI_API_KEY
       });
 
-      vectorStore = await MemoryVectorStore.fromDocuments(splitDocs, embeddings);
-      console.log(`Initialized MemoryVectorStore with ${splitDocs.length} chunks from ${files.length} files.`);
+      const vectors = await embeddings.embedDocuments(splitDocs.map(d => d.pageContent));
+      
+      localDocs = splitDocs.map((doc, i) => ({
+        text: doc.pageContent,
+        vector: vectors[i]
+      }));
+      
+      console.log(`Initialized custom vector store with ${splitDocs.length} chunks from ${files.length} files.`);
     } else {
       console.log("No .txt files found in car_manuals directory.");
     }
@@ -78,12 +95,25 @@ async function processChat(vehicleId, workshopId, userMessage, chatHistory = [])
     }
   }
 
-  // 2. Gather External Knowledge (MemoryVectorStore RAG)
-  if (vectorStore) {
+  // 2. Gather External Knowledge (Custom In-Memory RAG)
+  if (localDocs.length > 0) {
     try {
-      const results = await vectorStore.similaritySearch(userMessage, 3);
-      if (results && results.length > 0) {
-        manualContext = "\nRelevant Manual Excerpts:\n" + results.map(r => r.pageContent).join("\n\n");
+      const embeddings = new GoogleGenerativeAIEmbeddings({
+        model: "text-embedding-004",
+        apiKey: process.env.GEMINI_API_KEY
+      });
+      const queryVector = await embeddings.embedQuery(userMessage);
+      
+      const scoredDocs = localDocs.map(doc => ({
+        text: doc.text,
+        score: cosineSimilarity(queryVector, doc.vector)
+      }));
+      
+      scoredDocs.sort((a, b) => b.score - a.score);
+      const topDocs = scoredDocs.slice(0, 3);
+      
+      if (topDocs.length > 0) {
+        manualContext = "\nRelevant Manual Excerpts:\n" + topDocs.map(d => d.text).join("\n\n");
       }
     } catch (err) {
       console.error("Error searching vector store:", err);
