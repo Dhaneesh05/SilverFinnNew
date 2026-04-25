@@ -88,5 +88,8 @@ The `/backend/car_manuals/` directory contains PDF/TXT repair manuals. The backe
 ## 🤝 Contributing
 Contributions, issues, and feature requests are welcome!
 
+The Video Presentation Link:
+https://drive.google.com/drive/folders/1oJ7kpkgNQqk_GVwdk7DMD4zoCMEg5eHx?usp=sharing 
+
 ---
 *Developed with ❤️ during the UM Hackathon 2026*
